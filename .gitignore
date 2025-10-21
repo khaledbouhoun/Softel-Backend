@@ -1,0 +1,53 @@
+# ===========================================
+# Laravel Project .gitignore
+# ===========================================
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Composer dependencies
+/vendor
+
+# Node dependencies
+/node_modules
+
+# Laravel build and cache directories
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/app/public
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+
+# IDE and system files
+/.idea
+/.vscode
+/.fleet
+/.DS_Store
+Thumbs.db
+
+# PHPUnit cache
+.phpunit.cache
+
+# Homestead & Docker
+Homestead.yaml
+Homestead.json
+/.vagrant
+docker-compose*.yml
+Dockerfile
+
+# NPM/Yarn logs
+npm-debug.log
+yarn-error.log
+
+# Authentication and secrets
+auth.json
+
+# Compiled assets (Vite / Mix)
+mix-manifest.json
+vite.config.ts.timestamp*
