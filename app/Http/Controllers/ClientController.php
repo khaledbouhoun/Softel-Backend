@@ -35,9 +35,10 @@ class ClientController extends Controller
                 'message' => 'Client not found'
             ], 404);
         } else if (!$client && $clientNew) {
-            // If found in ClientsNew, create in Clients
+            // If found in ClientsNew show message for wait to confirm from your admin Company
             return response()->json('', 401);
         } else if ($client) {
+            // enter the store 
 
             $tokenName = 'auth_token_' . $request->ClsNo . '_' . $client->CliNo;
             // Delete any existing token with this name

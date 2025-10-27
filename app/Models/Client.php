@@ -27,7 +27,7 @@ class Client extends Authenticatable
         'CliEmail',
         'CliGoogleId',
         'CliActif',
-        'CliTfe',
+        'CliTarif',
     ];
 
     protected $hidden = [

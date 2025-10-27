@@ -65,23 +65,31 @@ class Product extends Model
     }
 
 
-    public function tarifs($Cls = null)
-    {
-        return $this->hasMany(Tarif::class, 'TfdArt', 'ArtNo')->where('TfdCls', $Cls);
-    }
+
 
     public function imagesarticles($Cls = null)
     {
         return $this->hasMany(Imagesarticles::class, 'ImgArt', 'ArtNo')->where('ImgCls', $Cls);
     }
 
+    public function tarifs($Cls = null)
+    {
+        return $this->hasMany(Tarif::class, 'TfdArt', 'ArtNo')->where('TfdCls', $Cls);
+    }
 
     public function priceForClient($client)
     {
-        $tarif = $this->tarifs($client->CliCls)
-            ->where('TfdTfe', $client->CliTfe)
-            ->first();
+        $query = $this->tarifs($client->CliCls);
 
-        return $tarif ? (float) $tarif->TfdPrixTTC : (float) $this->ArtPrix;
+        if (!empty($client->CliTarif)) {
+            $price = $query->where('TfdTfe', $client->CliTarif)->value('TfdPrixTTC');
+            if ($price !== null) {
+                return (float) $price;
+            }
+        }
+
+        // If no specific tarif found or CliTarif is empty, get any tarif or fall back to ArtPrix
+        $price = $query->value('TfdPrixTTC');
+        return (float) ($price ?? $this->ArtPrix);
     }
 }
