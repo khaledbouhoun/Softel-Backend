@@ -15,77 +15,98 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $client = TokenHelper::getUser($request);
+
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $offset = $request->input('offset', 0); // default 0
-        $limit = $request->input('limit', 15);  // default 15
-        $famno = $request->input('famNo', '00');  // default 15
+        $limit  = min((int)$request->query('limit', 15), 50);
+        $offset = max((int)$request->query('offset', 0), 0);
+        $famno  = $request->query('famNo', '00');
+
+        // -------------------------
+        // QUERY (USING SCOPES)
+        // -------------------------
+        $query = Product::forClient($client);
 
         if ($famno !== '00') {
-            $products = Product::where('ArtCls', $client->CliCls)
-                ->where('ArtFam', $famno)
-                ->skip($offset)
-                ->take($limit)
-                ->get();
-        } else {
-
-            $products = Product::where('ArtCls', $client->CliCls)
-                ->skip($offset)
-                ->take($limit)
-                ->get();
+            $query->where('ArtFam', $famno);
         }
+
+        $products = $query
+            ->withClientRelations($client) // ⚡ CLEAN + CENTRALIZED
+            ->skip($offset)
+            ->take($limit)
+            ->get();
 
         if ($products->isEmpty()) {
             return response()->json(['message' => 'No products found'], 404);
-        } else {
-            $commandeHead = CommandeHead::where('CdeCls', $client->CliCls)
-                ->where('CdeCli', $client->CliNo)
-                ->where('CdeStatus', 0)
-                ->first();
-
-
-
-
-            $formatted = $products->map(
-                function ($product) use ($client, $commandeHead) { {
-                        $ArtQte = 0;
-                        if ($commandeHead) {
-                            if (CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->exists()) {
-                                $ArtQte = (float) CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->first()->CddQte;
-                            } else {
-                                $ArtQte = 0;
-                            }
-                        } else {
-                            $ArtQte = 0;
-                        }
-
-                        return [
-                            'ArtNo' => $product->ArtNo,
-                            'ArtNom' => $product->ArtNom,
-                            'ArtFam' => optional($product->familles($client->CliCls)->first())->FamNom,
-                            'ArtSFam' => optional($product->sousfamilles($product->ArtFam, $client->CliCls)->first())->SouNom,
-                            'ArtColisage' => optional($product->cloisage($client->CliCls)->first())->ColNo,
-                            'ArtColisageNom' => optional($product->cloisage($client->CliCls)->first())->ColABV,
-                            'ArtUni' => optional($product->unite($client->CliCls)->first())->UniABV,
-                            'ArtUntCol' => (float) $product->ArtUntCol,
-                            'ArtPrix' => $product->priceForClient($client),
-                            'ArtQte' => $ArtQte,
-                            'ArtImages' => $product->imagesarticles($client->CliCls)->get()
-                        ];
-                    }
-                }
-            );
-
-
-            return response()->json(['data' => $formatted, 'cls' => $client->CliCls], 201);
         }
+
+        // -------------------------
+        // CART (optimized already)
+        // -------------------------
+        $commandeHead = CommandeHead::where('CdeCls', $client->CliCls)
+            ->where('CdeCli', $client->CliNo)
+            ->where('CdeStatus', 0)
+            ->first();
+
+        $details = collect();
+
+        if ($commandeHead) {
+            $details = CommandeDetail::where('CddID', $commandeHead->CdeID)
+                ->get()
+                ->keyBy('CddArt');
+        }
+
+        // -------------------------
+        // FORMAT RESPONSE (NO QUERIES INSIDE LOOP)
+        // -------------------------
+        $formatted = $products->map(function ($product) use ($client, $details) {
+
+            $ArtQte = $details[$product->ArtNo]->CddQte ?? 0;
+
+            return [
+                'ArtNo' => $product->ArtNo,
+                'ArtNom' => $product->ArtNom,
+
+                // ✅ FIXED: direct relations (NO parameters)
+                'ArtFam' => optional($product->familles)->FamNom,
+                'ArtSFam' => optional($product->sousfamilles)->SouNom,
+
+                'ArtColisage' => optional($product->cloisage)->ColNo,
+                'ArtColisageNom' => optional($product->cloisage)->ColABV,
+
+                'ArtUni' => optional($product->unite)->UniABV,
+
+                'ArtUntCol' => (float) $product->ArtUntCol,
+
+                // ⚡ optimized pricing (no extra queries)
+                'ArtPrix' => $product->priceForClient($client),
+
+                'ArtQte' => (float) $ArtQte,
+
+                // ⚡ already eager loaded
+                'ArtImages' => $product->imagesarticles->map(function ($img) {
+                    return [
+                        'ImgNom' => $img->ImgNom
+                            ? url('images/articles/' . $img->ImgNom)
+                            : url('images/default.png'),
+                    ];
+                }),
+            ];
+        });
+
+        return response()->json([
+            'data' => $formatted,
+            'cls'  => $client->CliCls
+        ], 200);
     }
 
     public function cartCount(Request $request)
     {
         $client = TokenHelper::getUser($request);
+
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
@@ -95,168 +116,241 @@ class ProductController extends Controller
             ->where('CdeStatus', 0)
             ->first();
 
+        $count = 0;
+
         if ($commandeHead) {
             $count = CommandeDetail::where('CddID', $commandeHead->CdeID)->count();
-        } else {
-            $count = 0;
         }
 
-
-        return response()->json(['cartCount' => (int) $count], 200);
+        return response()->json([
+            'cartCount' => (int) $count
+        ], 200);
     }
 
 
     public function imagesbanner(Request $request)
     {
         $client = TokenHelper::getUser($request);
+
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-
-
-
-        $images = Imagesbanner::where('ImgCls', $client->CliCls)
+        $images = Imagesbanner::with([
+            'sousfamilles' => function ($q) use ($client) {
+                $q->where('SouCls', $client->CliCls);
+            }
+        ])
+            ->where('ImgCls', $client->CliCls)
             ->get();
 
         if ($images->isEmpty()) {
             return response()->json(['message' => 'No images found'], 404);
         }
-        $images = $images->map(function ($image) use ($client) {
+
+        $formatted = $images->map(function ($image) {
 
             return [
                 'ImgFam' => $image->ImgFam,
                 'ImgSFam' => $image->ImgSFam,
-                'ImgSFamNom' => optional($image->sousfamilles($image->ImgFam, $client->CliCls)->first())->SouNom,
-                'ImgNom' => $image->ImgNom,
 
+                // ✅ no query here anymore
+                'ImgSFamNom' => optional($image->sousfamilles)->SouNom,
+
+                'ImgNom' => $image->ImgNom
+                    ? url('images/banners/' . $image->ImgNom)
+                    : url('images/default.png'),
             ];
         });
 
-        return response()->json($images, 200);
+        return response()->json($formatted, 200);
     }
 
     public function search(Request $request, $search)
     {
         $client = TokenHelper::getUser($request);
+
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
+        $limit  = min((int)$request->query('limit', 15), 50);
+        $offset = max((int)$request->query('offset', 0), 0);
 
-
-        $products = Product::with(['company', 'familles', 'sousfamilles', 'cloisage', 'unite'])
-            ->where('ArtCls', $client->CliCls)
-            ->where(function ($query) use ($search) {
-                $query->where('ArtNom', 'like', "%{$search}%");
+        // -------------------------
+        // Search query
+        // -------------------------
+        $products = Product::where('ArtCls', $client->CliCls)
+            ->where(function ($q) use ($search) {
+                $q->where('ArtNom', 'like', "{$search}%")   // starts with (fast)
+                    ->orWhere('ArtNom', 'like', "% {$search}%"); // word match
             })
-            ->get();
-
-        if ($products->isEmpty()) {
-            return response()->json(['message' => 'No products found'], 404);
-        } else {
-            $commandeHead = CommandeHead::where('CdeCli', $client->CliNo)
-                ->where('CdeStatus', 0)
-                ->first();
-
-
-
-            $formatted = $products->map(
-                function ($product) use ($client, $commandeHead) { {
-                        $ArtQte = 0;
-                        if ($commandeHead) {
-                            if (CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->exists()) {
-                                $ArtQte = (float) CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->first()->CddQte;
-                            } else {
-                                $ArtQte = 0;
-                            }
-                        } else {
-                            $ArtQte = 0;
-                        }
-                        return [
-                            'ArtNo' => $product->ArtNo,
-                            'ArtNom' => $product->ArtNom,
-                            'ArtFam' => optional($product->familles($client->CliCls)->first())->FamNom,
-                            'ArtSFam' => optional($product->sousfamilles($product->ArtFam, $client->CliCls)->first())->SouNom,
-                            'ArtColisage' => optional($product->cloisage($client->CliCls)->first())->ColNo,
-                            'ArtColisageNom' => optional($product->cloisage($client->CliCls)->first())->ColABV,
-                            'ArtUni' => optional($product->unite($client->CliCls)->first())->UniABV,
-                            'ArtUntCol' => (float) $product->ArtUntCol,
-                            'ArtPrix' => $product->priceForClient($client),
-                            'ArtQte' => $ArtQte,
-                        ];
-                    }
-                }
-            );
-
-
-            return response()->json($formatted, 200);
-        }
-    }
-
-
-    public function parfamilles(Request $request)
-    {
-        $client = TokenHelper::getUser($request);
-        if (!$client) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-
-
-
-
-
-
-        $offset = $request->input('offset', 0); // default 0
-        $limit = $request->input('limit', 15);  // default 15
-
-        $products = Product::with(['company', 'familles', 'sousfamilles', 'cloisage', 'unite'])
-            ->where('ArtCls', $client->CliCls)
-            ->where('ArtFam', $request->input('ArtFam'))
-            ->where('ArtSFam', $request->input('ArtSFam'))
+            ->with([
+                'familles',
+                'sousfamilles' => fn($q) => $q->where('SouCls', $client->CliCls),
+                'cloisage',
+                'unite',
+                'imagesarticles' => fn($q) => $q->where('ImgCls', $client->CliCls),
+            ])
             ->skip($offset)
             ->take($limit)
             ->get();
 
         if ($products->isEmpty()) {
             return response()->json(['message' => 'No products found'], 404);
-        } else {
-            $commandeHead = CommandeHead::where('CdeCli', $client->CliNo)
-                ->where('CdeStatus', 0)
-                ->first();
-
-
-
-            $formatted = $products->map(
-                function ($product) use ($client, $commandeHead) { {
-                        $ArtQte = 0;
-                        if ($commandeHead) {
-                            if (CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->exists()) {
-                                $ArtQte = (float) CommandeDetail::where('CddArt', $product->ArtNo)->where('CddID', $commandeHead->CdeID)->first()->CddQte;
-                            } else {
-                                $ArtQte = 0;
-                            }
-                        } else {
-                            $ArtQte = 0;
-                        }
-                        return [
-                            'ArtNo' => $product->ArtNo,
-                            'ArtNom' => $product->ArtNom,
-                            'ArtFam' => optional($product->familles($client->CliCls)->first())->FamNom,
-                            'ArtSFam' => optional($product->sousfamilles($product->ArtFam, $client->CliCls)->first())->SouNom,
-                            'ArtColisage' => optional($product->cloisage($client->CliCls)->first())->ColNo,
-                            'ArtColisageNom' => optional($product->cloisage($client->CliCls)->first())->ColABV,
-                            'ArtUni' => optional($product->unite($client->CliCls)->first())->UniABV,
-                            'ArtUntCol' => (float) $product->ArtUntCol,
-                            'ArtPrix' => $product->priceForClient($client),
-                            'ArtQte' => $ArtQte,
-                        ];
-                    }
-                }
-            );
-
-
-            return response()->json($formatted, 201);
         }
+
+        // -------------------------
+        // Load cart details once
+        // -------------------------
+        $commandeHead = CommandeHead::where('CdeCli', $client->CliNo)
+            ->where('CdeStatus', 0)
+            ->first();
+
+        $details = collect();
+
+        if ($commandeHead) {
+            $details = CommandeDetail::where('CddID', $commandeHead->CdeID)
+                ->get()
+                ->keyBy('CddArt');
+        }
+
+        // -------------------------
+        // Format
+        // -------------------------
+        $formatted = $products->map(function ($product) use ($client, $details) {
+
+            $ArtQte = $details[$product->ArtNo]->CddQte ?? 0;
+
+            return [
+                'ArtNo' => $product->ArtNo,
+                'ArtNom' => $product->ArtNom,
+
+                'ArtFam' => optional($product->familles)->FamNom,
+                'ArtSFam' => optional($product->sousfamilles)->SouNom,
+
+                'ArtColisage' => optional($product->cloisage)->ColNo,
+                'ArtColisageNom' => optional($product->cloisage)->ColABV,
+
+                'ArtUni' => optional($product->unite)->UniABV,
+
+                'ArtUntCol' => (float)$product->ArtUntCol,
+                'ArtPrix' => $product->priceForClient($client),
+
+                'ArtQte' => (float)$ArtQte,
+
+                'ArtImages' => $product->imagesarticles->map(fn($img) => [
+                    'ImgNom' => $img->ImgNom
+                        ? url('images/articles/' . $img->ImgNom)
+                        : url('images/default.png'),
+                ]),
+            ];
+        });
+
+        return response()->json($formatted, 200);
+    }
+
+    public function parfamilles(Request $request)
+    {
+        $client = TokenHelper::getUser($request);
+
+        if (!$client) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $limit  = min((int)$request->query('limit', 15), 50);
+        $offset = max((int)$request->query('offset', 0), 0);
+
+        $ArtFam  = $request->query('ArtFam');
+        $ArtSFam = $request->query('ArtSFam');
+
+        // -------------------------
+        // Build query
+        // -------------------------
+        $query = Product::where('ArtCls', $client->CliCls);
+
+        if ($ArtFam) {
+            $query->where('ArtFam', $ArtFam);
+        }
+
+        if ($ArtSFam) {
+            $query->where('ArtSFam', $ArtSFam);
+        }
+
+        // -------------------------
+        // Eager loading (FIXED)
+        // -------------------------
+        $products = $query->with([
+            'familles',
+            'sousfamilles',
+            'cloisage',
+            'unite',
+            'imagesarticles' => function ($q) use ($client) {
+                $q->where('ImgCls', $client->CliCls);
+            }
+        ])
+            ->skip($offset)
+            ->take($limit)
+            ->get();
+
+        if ($products->isEmpty()) {
+            return response()->json(['message' => 'No products found'], 404);
+        }
+
+        // -------------------------
+        // Load commande head
+        // -------------------------
+        $commandeHead = CommandeHead::where('CdeCli', $client->CliNo)
+            ->where('CdeStatus', 0)
+            ->first();
+
+        // -------------------------
+        // Load details ONCE (FIXED)
+        // -------------------------
+        $details = collect();
+
+        if ($commandeHead) {
+            $details = CommandeDetail::where('CddID', $commandeHead->CdeID)
+                ->get()
+                ->keyBy('CddArt');
+        }
+
+        // -------------------------
+        // Format response (NO DB calls inside)
+        // -------------------------
+        $formatted = $products->map(function ($product) use ($client, $details) {
+
+            $ArtQte = isset($details[$product->ArtNo])
+                ? (float)$details[$product->ArtNo]->CddQte
+                : 0;
+
+            return [
+                'ArtNo' => $product->ArtNo,
+                'ArtNom' => $product->ArtNom,
+
+                'ArtFam' => optional($product->familles)->FamNom,
+                'ArtSFam' => optional($product->sousfamilles)->SouNom,
+
+                'ArtColisage' => optional($product->cloisage)->ColNo,
+                'ArtColisageNom' => optional($product->cloisage)->ColABV,
+
+                'ArtUni' => optional($product->unite)->UniABV,
+
+                'ArtUntCol' => (float)$product->ArtUntCol,
+                'ArtPrix' => $product->priceForClient($client),
+
+                'ArtQte' => $ArtQte,
+
+                'ArtImages' => $product->imagesarticles->map(function ($img) {
+                    return [
+                        'ImgNom' => $img->ImgNom
+                            ? url('images/articles/' . $img->ImgNom)
+                            : url('images/default.png'),
+                    ];
+                }),
+            ];
+        });
+
+        return response()->json($formatted, 200);
     }
 }

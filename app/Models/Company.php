@@ -27,6 +27,7 @@ class Company extends Model
     ];
 
 
+
     public function clients()
     {
         return $this->hasMany(ClientsNew::class, 'CliCls', 'ClsNo');
@@ -51,6 +52,6 @@ class Company extends Model
     {
         return $this->hasMany(SouFamilles::class, 'SouCls', 'ClsNo');
     }
-    
+
 
 }

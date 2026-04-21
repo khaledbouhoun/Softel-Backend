@@ -9,32 +9,34 @@ class TokenHelper
 {
     public static function getUser(Request $request)
     {
-        $token = $request->bearerToken();
+        // Accepts BOTH Authorization header AND custom X-Auth-Token header
+        $token = $request->header('X-Auth-Token')
+            ?? $request->bearerToken();
+
         if (!$token) {
             return null;
         }
 
+        // Validate token with Sanctum
         $accessToken = PersonalAccessToken::findToken($token);
         if (!$accessToken) {
             return null;
         }
 
+        // Get user/client
         $client = $accessToken->tokenable;
 
-        // استخراج الشركة من التوكن
-        $company = null;
-        foreach ($accessToken->abilities as $ability) {
-            if (str_starts_with($ability, 'company:')) {
-                $company = explode(':', $ability)[1];
-                break;
+        // Extract company from token abilities
+        $company = collect($accessToken->abilities)
+            ->first(fn($ability) => str_starts_with($ability, 'company:'));
+
+        if ($company) {
+            $companyId = explode(':', $company)[1] ?? null;
+            if ($companyId) {
+                $client->CliCls = $companyId;
             }
         }
 
-        // نعدل قيمة الشركة عند العميل عشان تتماشى مع التوكن
-        if ($company) {
-            $client->CliCls = $company;
-        }
-
-        return $client; // يرجع العميل مع cls الصحيح
+        return $client;
     }
 }

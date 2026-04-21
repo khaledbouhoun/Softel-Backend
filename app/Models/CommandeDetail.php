@@ -13,7 +13,9 @@ class CommandeDetail extends Model
     protected $table = 'vte_commandesd';
     public $timestamps = false;
     public $incrementing = false;
-    protected $primaryKey = 'CddID';
+    protected $primaryKey = null;
+    protected $keyType = 'int';
+
 
     protected $fillable = [
         'CddID',
@@ -27,6 +29,7 @@ class CommandeDetail extends Model
     ];
 
     protected $casts = [
+        'CddID' => 'integer',
         'CddColis' => 'decimal:2',
         'CddUntCol' => 'decimal:2',
         'CddQte' => 'decimal:2',

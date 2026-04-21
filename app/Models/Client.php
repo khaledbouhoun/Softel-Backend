@@ -34,10 +34,10 @@ class Client extends Authenticatable
         'CliGoogleId',
     ];
 
-    public function getAuthIdentifier()
-    {
-        return $this->CliCls . '-' . $this->CliNo;
-    }
+    // public function getAuthIdentifier()
+    // {
+    //     return $this->CliCls . '-' . $this->CliNo;
+    // }
 
 
 

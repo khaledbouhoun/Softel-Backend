@@ -22,6 +22,7 @@ class CommandeController extends Controller
 
 
         $commandes = CommandeHead::where('CdeCls', $client->CliCls)->where('CdeCli', $client->CliNo)->whereNot('CdeStatus', 0)
+            ->orderBy('CdeDate', 'desc')
             ->get();
 
         if ($commandes->isEmpty()) {
@@ -79,6 +80,17 @@ class CommandeController extends Controller
                         'CddQte'          => (float) $detail->CddQte,
                         'CddPrix'         => (float) $detail->CddPrix,
                         'CddMontant'      => (float) $detail->CddMontant,
+                        'CddImages'       => optional($product)->imagesarticles($client->CliCls)
+                            ->get()
+                            ->map(function ($img) {
+                                $file = $img->getRawOriginal('ImgNom');
+
+                                return [
+                                    'ImgNom' => $file
+                                        ? url('images/articles/' . $file)
+                                        : url('images/default.png'),
+                                ];
+                            }),
                     ];
                 });
                 return response()->json($formattedDetails, 200);
@@ -148,6 +160,17 @@ class CommandeController extends Controller
                     'CddQte'         => (float) $detail->CddQte,
                     'CddPrix'        => (float) $detail->CddPrix,
                     'CddMontant'     => (float) $detail->CddMontant,
+                    'CddImages'      => optional($product)->imagesarticles($client->CliCls)
+                        ->get()
+                        ->map(function ($img) {
+                            $file = $img->getRawOriginal('ImgNom');
+
+                            return [
+                                'ImgNom' => $file
+                                    ? url('images/articles/' . $file)
+                                    : url('images/default.png'),
+                            ];
+                        }),
                 ];
             });
             return response()->json($formattedDetails, 200);
@@ -193,6 +216,17 @@ class CommandeController extends Controller
                     'CddQte'         => (float) $detail->CddQte,
                     'CddPrix'        => (float) $detail->CddPrix,
                     'CddMontant'     => (float) $detail->CddMontant,
+                    'CddImages'      => optional($product)->imagesarticles($client->CliCls)
+                        ->get()
+                        ->map(function ($img) {
+                            $file = $img->getRawOriginal('ImgNom');
+
+                            return [
+                                'ImgNom' => $file
+                                    ? url('images/articles/' . $file)
+                                    : url('images/default.png'),
+                            ];
+                        }),
                 ];
             });
             return response()->json($formattedDetails, 200);
@@ -210,25 +244,18 @@ class CommandeController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $CddID    = $request->CddID;
-        $CddArtNo = $request->CddArtNo;
+        $deleted = CommandeDetail::where('CddID', $request->CddID)
+            ->where('CddArt', $request->CddArtNo)
+            ->delete();
 
-        $commandeDetails = CommandeDetail::where('CddArt', $CddArtNo)
-            ->where('CddID', $CddID)
-            ->first();
-
-        if (!$commandeDetails) {
+        if (!$deleted) {
             return response()->json(['message' => 'This detail does not exist'], 404);
         }
 
-        // نخزن نسخة قبل الحذف
-        $deletedData = $commandeDetails->toArray();
-
-        $commandeDetails->delete();
-
         return response()->json([
             'message' => 'Details deleted successfully',
-            'deleted' => $deletedData
+            'deleted' => $deleted,
+
         ], 200);
     }
 

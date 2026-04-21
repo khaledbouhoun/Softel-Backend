@@ -59,14 +59,10 @@ class ClientController extends Controller
 
 
     public function me(Request $request)
-
     {
-
-        $client = TokenHelper::getUser($request);
-        if (!$client) {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        return response()->json($client);
+        return response()->json([
+            'data' => $request->attributes->get('auth_user')
+        ]);
     }
 
     public function logout(Request $request)

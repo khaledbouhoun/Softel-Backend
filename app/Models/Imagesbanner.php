@@ -19,14 +19,8 @@ class Imagesbanner extends Model
         'ImgNom',
     ];
 
-    public function sousfamilles($familles = null, $Cls = null)
+    public function sousfamilles()
     {
-        if ($familles) {
-            return $this->belongsTo(SouFamilles::class, 'ImgSFam', 'SouNo')
-                ->where('SouFam', $familles)->where('SouCls', $Cls);
-        }
-        return $this->belongsTo(SouFamilles::class, 'ImgSFam', 'SouNo')->where('SouCls', $Cls);
+        return $this->belongsTo(SouFamilles::class, 'ImgSFam', 'SouNo');
     }
-
-  
 }

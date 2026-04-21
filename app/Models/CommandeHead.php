@@ -21,6 +21,8 @@ class CommandeHead extends Model
 
     ];
     protected $casts = [
+        'CdeID' => 'integer',
+        'CdeStatus' => 'integer',
         'CdeDate' => 'date:Y-m-d H:i:s',
         'CdeMontant' => 'decimal:2',
     ];

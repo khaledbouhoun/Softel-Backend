@@ -12,7 +12,6 @@ class Product extends Model
     public $timestamps = false;
     protected $primaryKey = null;
 
-
     protected $fillable = [
         'ArtCls',
         'ArtNo',
@@ -24,72 +23,101 @@ class Product extends Model
         'ArtUntCol',
         'ArtPrix',
     ];
+
     protected $casts = [
         'ArtUntCol' => 'decimal:2',
-        'ArtPrix' => 'decimal:2',
+        'ArtPrix'   => 'decimal:2',
     ];
 
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONS (NO PARAMETERS ✅)
+    |--------------------------------------------------------------------------
+    */
 
     public function company()
     {
         return $this->belongsTo(Company::class, 'ArtCls', 'ClsNo');
     }
 
-
-    public function familles($Cls = null)
+    public function familles()
     {
-        return $this->belongsTo(Familles::class, 'ArtFam', 'FamNo')
-            ->where('FamCls', $Cls);
+        return $this->belongsTo(Familles::class, 'ArtFam', 'FamNo');
     }
 
-
-    public function sousfamilles($familles = null, $Cls = null)
+    public function sousfamilles()
     {
-        if ($familles) {
-            return $this->belongsTo(SouFamilles::class, 'ArtSFam', 'SouNo')
-                ->where('SouFam', $familles)->where('SouCls', $Cls);
-        }
-        return $this->belongsTo(SouFamilles::class, 'ArtSFam', 'SouNo')->where('SouCls', $Cls);
+        return $this->belongsTo(SouFamilles::class, 'ArtSFam', 'SouNo');
     }
 
-
-    public function cloisage($Cls = null)
+    public function cloisage()
     {
-        return $this->belongsTo(Colisages::class, 'ArtColis', 'ColNo')->where('ColCls', $Cls);
+        return $this->belongsTo(Colisages::class, 'ArtColis', 'ColNo');
     }
 
-
-    public function unite($Cls = null)
+    public function unite()
     {
-        return $this->belongsTo(Unites::class, 'ArtUni', 'UniNo')->where('UniCls', $Cls);
+        return $this->belongsTo(Unites::class, 'ArtUni', 'UniNo');
     }
 
-
-
-
-    public function imagesarticles($Cls = null)
+    public function imagesarticles()
     {
-        return $this->hasMany(Imagesarticles::class, 'ImgArt', 'ArtNo')->where('ImgCls', $Cls);
+        return $this->hasMany(Imagesarticles::class, 'ImgArt', 'ArtNo');
     }
 
-    public function tarifs($Cls = null)
+    public function tarifs()
     {
-        return $this->hasMany(Tarif::class, 'TfdArt', 'ArtNo')->where('TfdCls', $Cls);
+        return $this->hasMany(Tarif::class, 'TfdArt', 'ArtNo');
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SCOPES (FILTER BY CLIENT ✅)
+    |--------------------------------------------------------------------------
+    */
+
+    public function scopeForClient($query, $client)
+    {
+        return $query->where('ArtCls', $client->CliCls);
+    }
+
+    public function scopeWithClientRelations($query, $client)
+    {
+        return $query->with([
+            'familles' => fn($q) => $q->where('FamCls', $client->CliCls),
+            'sousfamilles' => fn($q) => $q->where('SouCls', $client->CliCls),
+            'cloisage' => fn($q) => $q->where('ColCls', $client->CliCls),
+            'unite' => fn($q) => $q->where('UniCls', $client->CliCls),
+            'imagesarticles' => fn($q) => $q->where('ImgCls', $client->CliCls),
+            'tarifs' => fn($q) => $q->where('TfdCls', $client->CliCls),
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BUSINESS LOGIC
+    |--------------------------------------------------------------------------
+    */
 
     public function priceForClient($client)
     {
-        $query = $this->tarifs($client->CliCls);
+        // IMPORTANT: use already loaded tarifs (no query)
+        $tarifs = $this->tarifs;
+
+        if ($tarifs->isEmpty()) {
+            return (float) $this->ArtPrix;
+        }
 
         if (!empty($client->CliTarif)) {
-            $price = $query->where('TfdTfe', $client->CliTarif)->value('TfdPrixTTC');
-            if ($price !== null) {
-                return (float) $price;
+            $price = $tarifs
+                ->where('TfdTfe', $client->CliTarif)
+                ->first();
+
+            if ($price) {
+                return (float) $price->TfdPrixTTC;
             }
         }
 
-        // If no specific tarif found or CliTarif is empty, get any tarif or fall back to ArtPrix
-        $price = $query->value('TfdPrixTTC');
-        return (float) ($price ?? $this->ArtPrix);
+        return (float) ($tarifs->first()->TfdPrixTTC ?? $this->ArtPrix);
     }
 }
