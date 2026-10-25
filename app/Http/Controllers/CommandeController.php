@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\TokenHelper;
 use Illuminate\Http\Request;
+use App\Models\Client;
 use App\Models\CommandeHead;
 use App\Models\CommandeDetail;
 use App\Models\Product;
@@ -382,26 +383,36 @@ class CommandeController extends Controller
     try {
 
       // -------------------------
-      // GET OR CREATE HEAD
+      // SERIALIZE CONCURRENT CART CREATION (DATA-01)
+      // Lock stable client record to serialize concurrent cart-creation requests
       // -------------------------
-      $commandeHead = CommandeHead::firstOrCreate(
-        [
+      Client::where('CliNo', $client->CliNo)
+        ->where('CliCls', $client->CliCls)
+        ->lockForUpdate()
+        ->first();
+
+      // -------------------------
+      // GET OR CREATE HEAD (PROTECTED RE-CHECK)
+      // -------------------------
+      $commandeHead = CommandeHead::where('CdeCls', $client->CliCls)
+        ->where('CdeCli', $client->CliNo)
+        ->where('CdeStatus', 0)
+        ->lockForUpdate()
+        ->first();
+
+      if (!$commandeHead) {
+        $commandeHead = CommandeHead::create([
           'CdeCls' => $client->CliCls,
           'CdeCli' => $client->CliNo,
           'CdeStatus' => 0,
-        ],
-        [
           'CdeDate' => now(),
           'CdeMontant' => 0,
-        ]
-      );
-
-      // -------------------------
-      // UPDATE HEAD DATE
-      // -------------------------
-      $commandeHead->update([
-        'CdeDate' => now(),
-      ]);
+        ]);
+      } else {
+        $commandeHead->update([
+          'CdeDate' => now(),
+        ]);
+      }
 
       // -------------------------
       // STORE DETAIL
