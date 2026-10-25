@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\Client;
 use App\Models\ClientsNew;
 use Illuminate\Support\Facades\Validator;
+use Laravel\Sanctum\PersonalAccessToken;
 
 
 class ClientController extends Controller
@@ -69,12 +70,24 @@ class ClientController extends Controller
   {
     $client = TokenHelper::getUser($request);
 
-    if (!$client || !$client) {
+    if (!$client) {
       return response()->json(['message' => 'المستخدم غير مصادق'], 401);
     }
 
-    $client->currentAccessToken()->delete();
+    $currentToken = $client->currentAccessToken();
 
-    return response()->json(['message' => 'تم تسجيل الخروج']);
+    if ($currentToken) {
+      $currentToken->delete();
+    } else {
+      $token = $request->header('X-Auth-Token') ?? $request->bearerToken();
+      if ($token) {
+        $accessToken = PersonalAccessToken::findToken($token);
+        if ($accessToken && (string) $accessToken->tokenable_id === (string) $client->CliNo) {
+          $accessToken->delete();
+        }
+      }
+    }
+
+    return response()->json(['message' => 'تم تسجيل الخروج'], 200);
   }
 }
