@@ -75,87 +75,8 @@ Route::middleware('custom.auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| SANCTUM DEBUG (SAFE + CLEAN)
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/debug/auth', function (Request $request) {
-
-    $headerToken = $request->header('X-Auth-Token');
-    $bearerToken = $request->bearerToken();
-    $token = $headerToken ?? $bearerToken;
-
-    $accessToken = $token ? PersonalAccessToken::findToken($token) : null;
-
-    return response()->json([
-        'received_tokens' => [
-            'x_auth_token' => $headerToken,
-            'bearer_token' => $bearerToken,
-            'final_used' => $token,
-        ],
-
-        'sanctum' => [
-            'token_found' => (bool) $accessToken,
-            'token_id' => $accessToken?->id,
-            'abilities' => $accessToken?->abilities,
-        ],
-
-        'auth' => [
-            'request_user' => $request->user(),
-            'sanctum_check' => auth('sanctum')->check(),
-        ],
-
-        'headers' => $request->getHeaders(),
-    ]);
-});
-
-/*
-|--------------------------------------------------------------------------
-| CACHE CLEAR (DEV ONLY)
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/clear-cache', function () {
-    Artisan::call('optimize:clear');
-    return response()->json(['message' => 'Cache cleared']);
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| SIMPLE TEST ROUTES
+| HEALTH CHECK / STATUS
 |--------------------------------------------------------------------------
 */
 
 Route::get('/test', fn() => response()->json(['message' => 'API Works']));
-
-Route::get('/test-sanctum', function () {
-    return response()->json(['message' => 'Sanctum Works']);
-});
-
-/*
-|--------------------------------------------------------------------------
-| LOW LEVEL DEBUG (TOKEN ONLY)
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/debug/token', function (Request $request) {
-    return response()->json([
-        'x_auth_token' => $request->header('X-Auth-Token'),
-        'bearer_token' => $request->bearerToken(),
-    ]);
-});
-
-Route::get('/server-info', function () {
-    return response()->json([
-        'server' => $_SERVER,
-    ]);
-});
-
-Route::get('/test-auth-header', function (\Illuminate\Http\Request $request) {
-    return [
-        'auth' => $request->header('Authorization'),
-        'bearer' => $request->bearerToken(),
-        'server' => $_SERVER['HTTP_AUTHORIZATION'] ?? null,
-    ];
-});
