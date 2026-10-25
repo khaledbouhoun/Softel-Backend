@@ -362,7 +362,7 @@ class CommandeController extends Controller
       'CddColisage' => 'required|string|max:2',
       'CddColis' => 'nullable|numeric',
       'CddUntCol' => 'nullable|numeric',
-      'CddQte' => 'required|numeric',
+      'CddQte' => 'required|numeric|gt:0',
       'CddPrix' => 'required|numeric',
       'CddMontant' => 'required|numeric',
     ]);
@@ -376,6 +376,25 @@ class CommandeController extends Controller
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
     }
+
+    // Authoritative product lookup scoped to client's company
+    $product = Product::forClient($client)
+      ->withClientRelations($client)
+      ->where('ArtNo', $request->CddArt)
+      ->first();
+
+    if (!$product) {
+      return response()->json(['message' => 'Product not found'], 404);
+    }
+
+    $authoritativePrice = $product->priceForClient($client);
+
+    if ($authoritativePrice === null || !is_numeric($authoritativePrice) || $authoritativePrice < 0) {
+      return response()->json(['message' => 'Valid tariff not found for product'], 422);
+    }
+
+    $quantity = (float) $request->CddQte;
+    $authoritativeMontant = round((float) $authoritativePrice * $quantity, 2);
 
     DB::beginTransaction();
 
@@ -404,9 +423,9 @@ class CommandeController extends Controller
       ]);
 
       // -------------------------
-      // STORE DETAIL
+      // STORE DETAIL (AUTHORITATIVE VALUES)
       // -------------------------
-      $this->storeDetail($request->all(), $commandeHead->CdeID);
+      $this->storeDetail($request->all(), $commandeHead->CdeID, (float) $authoritativePrice, $authoritativeMontant);
 
       // -------------------------
       // UPDATE TOTAL (ONE QUERY)
@@ -434,8 +453,11 @@ class CommandeController extends Controller
     }
   }
 
-  public function storeDetail($detail, $commandeHeadId)
+  public function storeDetail($detail, $commandeHeadId, $authoritativePrice = null, $authoritativeMontant = null)
   {
+    $unitPrice = $authoritativePrice !== null ? $authoritativePrice : ($detail['CddPrix'] ?? null);
+    $montant = $authoritativeMontant !== null ? $authoritativeMontant : ($detail['CddMontant'] ?? null);
+
     DB::table('vte_commandesd')->updateOrInsert(
       [
         'CddID' => $commandeHeadId,
@@ -446,8 +468,8 @@ class CommandeController extends Controller
         'CddColis' => $detail['CddColis'] ?? null,
         'CddUntCol' => $detail['CddUntCol'] ?? null,
         'CddQte' => $detail['CddQte'] ?? null,
-        'CddPrix' => $detail['CddPrix'] ?? null,
-        'CddMontant' => $detail['CddMontant'] ?? null,
+        'CddPrix' => $unitPrice,
+        'CddMontant' => $montant,
       ]
     );
   }
