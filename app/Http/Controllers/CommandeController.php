@@ -340,18 +340,42 @@ class CommandeController extends Controller
       return response()->json(['errors' => $validator->errors()], 422);
     }
 
-    $deleted = CommandeDetail::where('CddID', $request->CddID)
-      ->where('CddArt', $request->CddArtNo)
-      ->delete();
+    return DB::transaction(function () use ($request, $client) {
+      $commandeHead = CommandeHead::where('CdeID', $request->CddID)
+        ->lockForUpdate()
+        ->first();
 
-    if ($deleted === 0) {
-      return response()->json(['message' => 'Detail not found'], 404);
-    }
+      if (!$commandeHead) {
+        return response()->json(['message' => 'Commande not found'], 404);
+      }
 
-    return response()->json([
-      'message' => 'Deleted successfully',
-      'deleted_rows' => $deleted
-    ], 200);
+      if ($commandeHead->CdeCli !== $client->CliNo || $commandeHead->CdeCls !== $client->CliCls) {
+        return response()->json(['message' => 'Unauthorized to modify this commande'], 403);
+      }
+
+      if ((int) $commandeHead->CdeStatus !== 0) {
+        return response()->json(['message' => 'Cannot modify confirmed commande'], 403);
+      }
+
+      $deleted = CommandeDetail::where('CddID', $commandeHead->CdeID)
+        ->where('CddArt', $request->CddArtNo)
+        ->delete();
+
+      if ($deleted === 0) {
+        return response()->json(['message' => 'Detail not found'], 404);
+      }
+
+      $newTotal = (float) CommandeDetail::where('CddID', $commandeHead->CdeID)->sum('CddMontant');
+
+      $commandeHead->update([
+        'CdeMontant' => $newTotal
+      ]);
+
+      return response()->json([
+        'message' => 'Deleted successfully',
+        'deleted_rows' => $deleted
+      ], 200);
+    });
   }
 
 
