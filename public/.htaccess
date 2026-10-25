@@ -14,6 +14,12 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # Intercept missing static images and return 404 without booting Laravel
+    RewriteCond %{REQUEST_URI} ^/images/ [NC,OR]
+    RewriteCond %{REQUEST_URI} \.(?:jpe?g|png|gif|webp|svg|ico)$ [NC]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ - [R=404,L]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
