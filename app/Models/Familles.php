@@ -36,4 +36,8 @@ class Familles extends Model
     {
         return $this->hasMany(Product::class, 'ArtFam', 'FamNo');
     }
+    public function imagesBanner()
+    {
+        return $this->hasMany(Imagesbanner::class, 'ImgFam', 'FamNo');
+    }
 }

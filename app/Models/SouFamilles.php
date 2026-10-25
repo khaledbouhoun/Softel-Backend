@@ -22,14 +22,14 @@ class SouFamilles extends Model
         'SouImg',
     ];
 
-    
+
 
 
     public function company()
     {
         return $this->belongsTo(Company::class, 'SouCls', 'ClsNo');
     }
-    
+
     public function famille()
     {
         return $this->belongsTo(Familles::class, 'SouFam', 'FamNo');
@@ -39,5 +39,10 @@ class SouFamilles extends Model
     public function products()
     {
         return $this->hasMany(Product::class, 'ArtSFam', 'SouNo');
+    }
+
+    public function imagesBanner()
+    {
+        return $this->hasMany(Imagesbanner::class, 'ImgSFam', 'SouNo');
     }
 }

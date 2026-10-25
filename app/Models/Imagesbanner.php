@@ -19,8 +19,20 @@ class Imagesbanner extends Model
         'ImgNom',
     ];
 
-    public function sousfamilles()
+    public function sousfamille()
     {
-        return $this->belongsTo(SouFamilles::class, 'ImgSFam', 'SouNo');
+        return $this->hasManyThrough(
+            SouFamilles::class,
+            Familles::class,
+            'FamNo',      // Foreign key on families table
+            'SouFam',     // Foreign key on souFamilles table
+            'ImgFam',     // Local key on imagesbanner
+            'FamNo'       // Local key on families
+        );
+    }
+
+    public function famille()
+    {
+        return $this->belongsTo(Familles::class, 'ImgFam', 'FamNo');
     }
 }

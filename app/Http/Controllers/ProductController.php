@@ -136,11 +136,7 @@ class ProductController extends Controller
             return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        $images = Imagesbanner::with([
-            'sousfamilles' => function ($q) use ($client) {
-                $q->where('SouCls', $client->CliCls);
-            }
-        ])
+        $images = Imagesbanner::with('famille.souFamilles') // Load through famille!
             ->where('ImgCls', $client->CliCls)
             ->get();
 
@@ -149,13 +145,17 @@ class ProductController extends Controller
         }
 
         $formatted = $images->map(function ($image) {
+            // Find the correct SouFamille that matches both ImgFam AND ImgSFam
+            $souFamille = $image->famille->souFamilles()
+                ->where('SouNo', $image->ImgSFam)
+                ->first();
 
             return [
                 'ImgFam' => $image->ImgFam,
                 'ImgSFam' => $image->ImgSFam,
 
-                // ✅ no query here anymore
-                'ImgSFamNom' => optional($image->sousfamilles)->SouNom,
+                // ✅ Get the correct SouFamille name
+                'ImgSFamNom' => $souFamille?->SouNom ?? 'N/A',
 
                 'ImgNom' => $image->ImgNom
                     ? url('images/banners/' . $image->ImgNom)
