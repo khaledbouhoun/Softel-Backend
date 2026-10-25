@@ -66,7 +66,7 @@ Route::middleware('custom.auth')->group(function () {
         Route::get('/', [CommandeController::class, 'index']);
         Route::get('/cart', [CommandeController::class, 'cart']);
         Route::get('/cart/{CdeID}', [CommandeController::class, 'cartTrackingDetails']);
-        Route::get('/confirmcommande', [CommandeController::class, 'confirmCommande']);
+        Route::match(['get', 'post'], '/confirmcommande', [CommandeController::class, 'confirmCommande']);
         Route::post('/store', [CommandeController::class, 'store']);
         Route::delete('/deletedetailsbyid', [CommandeController::class, 'deleteDetailsById']);
         Route::get('/{id}', [CommandeController::class, 'details']);
