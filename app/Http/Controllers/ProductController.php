@@ -191,6 +191,7 @@ class ProductController extends Controller
                 'cloisage',
                 'unite',
                 'imagesarticles' => fn($q) => $q->where('ImgCls', $client->CliCls),
+                'tarifs' => fn($q) => $q->where('TfdCls', $client->CliCls),
             ])
             ->skip($offset)
             ->take($limit)
@@ -287,7 +288,8 @@ class ProductController extends Controller
             'unite',
             'imagesarticles' => function ($q) use ($client) {
                 $q->where('ImgCls', $client->CliCls);
-            }
+            },
+            'tarifs' => fn($q) => $q->where('TfdCls', $client->CliCls),
         ])
             ->skip($offset)
             ->take($limit)
