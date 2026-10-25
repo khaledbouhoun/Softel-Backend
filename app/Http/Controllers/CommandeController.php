@@ -146,23 +146,42 @@ class CommandeController extends Controller
       return response()->json(['message' => 'Unauthorized'], 401);
     }
 
-    $commandeHead = CommandeHead::where('CdeCli', $client->CliNo)
-      ->where('CdeCls', $client->CliCls)
-      ->where('CdeStatus', 0)
-      ->first();
+    return DB::transaction(function () use ($request, $client) {
+      $query = CommandeHead::where('CdeCli', $client->CliNo)
+        ->where('CdeCls', $client->CliCls)
+        ->where('CdeStatus', 0);
 
-    if (!$commandeHead) {
-      return response()->json(['message' => 'No active commande found'], 404);
-    }
+      if ($request->filled('CdeID')) {
+        $query->where('CdeID', $request->input('CdeID'));
+      }
 
-    $commandeHead->update([
-      'CdeStatus' => 1,
-    ]);
+      $commandeHead = $query->lockForUpdate()->first();
 
-    return response()->json([
-      'message' => 'Commande confirmed successfully',
-      'commande' => $commandeHead->fresh()
-    ], 200);
+      if (!$commandeHead) {
+        return response()->json(['message' => 'No active commande found'], 404);
+      }
+
+      // Verify cart contains at least one item
+      $hasItems = CommandeDetail::where('CddID', $commandeHead->CdeID)->exists();
+
+      if (!$hasItems) {
+        return response()->json(['message' => 'Cannot confirm an empty cart'], 422);
+      }
+
+      // Authoritatively recalculate order total from existing details
+      $totalAmount = (float) CommandeDetail::where('CddID', $commandeHead->CdeID)->sum('CddMontant');
+
+      $commandeHead->update([
+        'CdeStatus' => 1,
+        'CdeMontant' => $totalAmount,
+        'CdeDate' => now(),
+      ]);
+
+      return response()->json([
+        'message' => 'Commande confirmed successfully',
+        'commande' => $commandeHead->fresh()
+      ], 200);
+    });
   }
 
   public function cart(Request $request)
