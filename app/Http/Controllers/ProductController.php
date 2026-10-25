@@ -136,7 +136,10 @@ class ProductController extends Controller
       return response()->json(['message' => 'Unauthorized'], 401);
     }
 
-    $images = Imagesbanner::with('famille.souFamilles') // Load through famille!
+    $images = Imagesbanner::with([
+        'famille' => fn($q) => $q->where('FamCls', $client->CliCls),
+        'famille.souFamilles' => fn($q) => $q->where('SouCls', $client->CliCls),
+      ])
       ->where('ImgCls', $client->CliCls)
       ->get();
 
