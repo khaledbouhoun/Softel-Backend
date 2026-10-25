@@ -14,7 +14,7 @@ class ProductController extends Controller
 
   public function index(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -105,7 +105,7 @@ class ProductController extends Controller
 
   public function cartCount(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -130,7 +130,7 @@ class ProductController extends Controller
 
   public function imagesbanner(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -168,7 +168,7 @@ class ProductController extends Controller
 
   public function search(Request $request, $search)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -253,7 +253,7 @@ class ProductController extends Controller
 
   public function parfamilles(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);

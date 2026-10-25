@@ -15,7 +15,7 @@ class CommandeController extends Controller
 {
   public function index(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -59,7 +59,7 @@ class CommandeController extends Controller
 
   public function details(Request $request, $id)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -140,7 +140,7 @@ class CommandeController extends Controller
 
   public function confirmCommande(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -167,7 +167,7 @@ class CommandeController extends Controller
 
   public function cart(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -246,7 +246,7 @@ class CommandeController extends Controller
 
   public function cartTrackingDetails(Request $request, $CdeID)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -325,7 +325,7 @@ class CommandeController extends Controller
 
   public function deleteDetailsById(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);
@@ -371,7 +371,7 @@ class CommandeController extends Controller
       return response()->json(['errors' => $validator->errors()], 422);
     }
 
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client) {
       return response()->json(['message' => 'Unauthorized'], 401);

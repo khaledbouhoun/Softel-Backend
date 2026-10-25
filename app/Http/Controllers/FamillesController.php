@@ -11,7 +11,7 @@ class FamillesController extends Controller
 {
     public function index(Request $request)
     {
-        $client = TokenHelper::getUser($request);
+        $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);
@@ -40,7 +40,7 @@ class FamillesController extends Controller
 
     public function soufamilles(Request $request, $FamNo)
     {
-        $client = TokenHelper::getUser($request);
+        $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
         if (!$client) {
             return response()->json(['message' => 'Unauthorized'], 401);

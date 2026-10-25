@@ -67,7 +67,7 @@ class ClientController extends Controller
 
   public function logout(Request $request)
   {
-    $client = TokenHelper::getUser($request);
+    $client = $request->attributes->get('auth_user') ?? TokenHelper::getUser($request);
 
     if (!$client || !$client) {
       return response()->json(['message' => 'المستخدم غير مصادق'], 401);
