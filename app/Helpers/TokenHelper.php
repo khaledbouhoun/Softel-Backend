@@ -26,6 +26,10 @@ class TokenHelper
         // Get user/client
         $client = $accessToken->tokenable;
 
+        if ($client) {
+            $client->withAccessToken($accessToken);
+        }
+
         // Extract company from token abilities
         $company = collect($accessToken->abilities)
             ->first(fn($ability) => str_starts_with($ability, 'company:'));
